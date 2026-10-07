@@ -7,4 +7,5 @@ MODULE 4 · puzzles — the levels, and where new ones come from.
     training/      short lessons, one idea each
     classic/       the nine levels of the first project review
     warehouse/     tight rooms where deadlock knowledge decides the search
+    showdown/      hard rooms picked so that all four algorithms behave differently
 """

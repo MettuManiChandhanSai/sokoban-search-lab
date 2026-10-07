@@ -22,6 +22,7 @@ PACKS = {                       # folder -> display name, in playing order
     "training": "Training",
     "classic": "Classic nine",
     "warehouse": "Warehouse",
+    "showdown": "Showdown",
 }
 
 

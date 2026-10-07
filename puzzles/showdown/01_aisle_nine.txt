@@ -1,0 +1,11 @@
+; Aisle Nine
+; The opener. All four finish, and each one needs about a tenth of the work of the one before it.
+##########
+#    ## ##
+##   #   #
+# ##. #  #
+# .  .$  #
+#  #$    #
+# #@$  $ #
+##### #. #
+##########

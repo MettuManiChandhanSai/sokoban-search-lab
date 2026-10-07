@@ -1,0 +1,10 @@
+; Four-way Stop
+; The fairest fight in the building: even the best algorithm has to search over a thousand positions.
+###########
+##  #.    #
+##.   #   #
+### $ #   #
+# $ . ##$##
+#@$      .#
+# # # #   #
+###########

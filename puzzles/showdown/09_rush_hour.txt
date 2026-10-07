@@ -1,0 +1,12 @@
+; Rush Hour
+; Six crates. BFS gives up and plain A* needs over a hundred thousand positions. Knowledge and a sharp heuristic are what get through.
+############
+#        #.#
+#### $. #  #
+#@$        #
+# $.#     .#
+# #  ####  #
+# # # . $ ##
+#  ## $$# ##
+###       .#
+############

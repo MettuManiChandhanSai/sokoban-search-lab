@@ -1,0 +1,12 @@
+; Backlog
+; Five crates. BFS runs out of budget; the three informed searches finish at very different speeds.
+###########
+#  ## ## .#
+#  #  $  .#
+# $    #  #
+##+#.  $ .#
+##$## #  $#
+#      #  #
+#    # # ##
+##  #     #
+###########

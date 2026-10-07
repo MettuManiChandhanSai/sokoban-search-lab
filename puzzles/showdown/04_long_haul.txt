@@ -1,0 +1,10 @@
+; Long Haul
+; Nineteen pushes. Plain A* is misled by the walls; watch how far its orange stain spreads.
+###########
+#.  ####  #
+# #      .#
+#  #  $## #
+# .  $  . #
+# ##$@$ # #
+#    ##   #
+###########

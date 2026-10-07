@@ -28,7 +28,7 @@ Python 3.9 or newer. Nothing to install.
 
 ## What is in the app
 
-- **Play** – 25 levels in three packs. Undo, redo, restart, timer, push and move
+- **Play** – 34 levels in four packs. Undo, redo, restart, timer, push and move
   counters, and the AI's optimum to beat. A deadlock coach names the rule you
   just broke ("Wall-line trap: ...") the moment a level becomes unwinnable.
 - **Hint** – the best solver searches from where you stand and marks the next push.
@@ -38,11 +38,39 @@ Python 3.9 or newer. Nothing to install.
 - **Overlays** – dead squares (point at one to see which rule kills it), the
   search trace, and your path against the optimal one.
 - **Race** – all four algorithms on the same level at the same time, with live
-  node counts on a log scale and a one-sentence verdict.
-- **Lab** – the benchmark, in the browser: a level-by-algorithm matrix, summary
-  tiles, copy as CSV or Markdown.
+  node counts on a log scale, a one-sentence verdict, and three graphs
+  afterwards: search steps, solution length and time.
+- **Lab** – the benchmark, in the browser: a level-by-algorithm matrix that can
+  show search steps, solution length, pushes or time; summary tiles; copy as
+  CSV or Markdown.
 - **Build** – a level editor with instant validation, and a generator that
   makes new solvable levels.
+- **Guide** – how the game, the algorithms and the numbers work, in plain
+  words. A first-visit card points new players to it, and every box in the
+  app has its own "How this works" line explaining each button.
+
+### The level packs
+
+| Pack | Levels | What it is for |
+| --- | ---: | --- |
+| Training | 7 | One idea per level: pushing, corners, wall lines, freezes, order |
+| Classic nine | 9 | The levels of the first review |
+| Warehouse | 9 | Tight generated rooms where deadlock knowledge matters |
+| Showdown | 9 | Hard rooms picked so that all four algorithms behave differently |
+
+### Do the algorithms give different answers?
+
+They all report the same number of **pushes**, on purpose: each is guaranteed
+to find the fewest possible, which is what makes the comparison fair. What
+differs is everything else:
+
+- **search steps** (positions expanded) differ on every hard level, usually by
+  a factor of five to ten from one rung to the next;
+- **time** follows the search steps;
+- **keeper moves** differ wherever several optimal solutions exist. BFS, A\*
+  and the matching search usually walk different routes. A\* and
+  A\* + Deadlock return the same route, because deadlock rules only remove
+  dead ends: same answer, fewer steps to find it.
 
 Keys: arrows or WASD move, `Z` undo, `Y` redo, `R` restart, `H` hint,
 `Space` play/pause, `N`/`P` next/previous level.
@@ -68,7 +96,7 @@ sokoban_ai_solver/
 ├── puzzles/       MODULE 4 · the levels
 │   ├── library.py     the catalogue: one text file per level, one folder per pack
 │   ├── generator.py   new levels by reverse play, graded by the solver
-│   └── training/ classic/ warehouse/
+│   └── training/ classic/ warehouse/ showdown/
 ├── analytics/     MODULE 5 · the evidence
 │   ├── benchmark.py   every algorithm on every level, pausable
 │   └── report.py      table, CSV, Markdown, per-algorithm summary
@@ -142,32 +170,52 @@ rather than argument:
 
 ## Results
 
-Measured on this project's 25 levels with `python run_benchmark.py
+Measured on this project's 34 levels with `python run_benchmark.py
 --node-limit 200000 --time-limit 20` (Python 3.11, one laptop core).
 
-**Totals over all 25 levels**
+**Totals over all 34 levels**
 
 | Algorithm | Levels solved | Positions expanded | Time | Median saving vs BFS |
 | --- | ---: | ---: | ---: | ---: |
-| BFS | 20 / 25 | 774,532 | 126.0 s | baseline |
-| A\* | 23 / 25 | 220,368 | 43.6 s | 80.5% fewer |
-| A\* + Deadlock | 24 / 25 | 157,169 | 39.2 s | 91.7% fewer |
-| A\* + Deadlock + Matching | 25 / 25 | 2,218 | 1.0 s | 98.5% fewer |
+| BFS | 27 / 34 | 1,585,175 | 193.9 s | baseline |
+| A\* | 33 / 34 | 479,526 | 61.2 s | 84.1% fewer |
+| A\* + Deadlock | 34 / 34 | 225,947 | 40.8 s | 92.6% fewer |
+| A\* + Deadlock + Matching | 34 / 34 | 4,930 | 0.9 s | 99.5% fewer |
 
-**Positions expanded on selected levels** (every finished search returns the same push count)
+**Search steps: positions expanded** (selected levels, then the whole Showdown pack)
 
 | Level | Crates | Optimal pushes | BFS | A\* | A\* + Deadlock | A\* + Deadlock + Matching |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Dead-end Lane | 3 | 15 | 2,046 | 262 | 42 | 15 |
 | Storeroom | 3 | 12 | 9,952 | 67 | 65 | 13 |
 | Night Shift | 3 | 18 | 6,189 | 2,377 | 515 | 20 |
-| Overstock | 4 | 17 | 75,718 | 14,731 | 5,221 | 17 |
 | Pallet Maze | 4 | 18 | 52,833 | 11,220 | 4,156 | 518 |
-| Inventory Day | 5 | 20 | gave up at 72,896 | gave up at 80,960 | 67,416 | 68 |
-| Peak Season | 5 | 21 | gave up at 71,072 | gave up at 105,824 | gave up at 76,704 | 1,415 |
+| Aisle Nine | 4 | 14 | 20,170 | 2,298 | 928 | 165 |
+| Double Stack | 4 | 15 | 36,971 | 2,273 | 964 | 35 |
+| Tight Turn | 4 | 15 | 38,746 | 3,822 | 1,340 | 31 |
+| Long Haul | 4 | 19 | 39,882 | 8,952 | 5,350 | 130 |
+| Bottleneck | 4 | 16 | 66,692 | 3,293 | 1,715 | 31 |
+| Four-way Stop | 4 | 18 | 59,926 | 11,336 | 5,078 | 1,365 |
+| Dead Stock | 4 | 21 | 77,568 | 23,707 | 2,969 | 79 |
+| Backlog | 5 | 17 | gave up at 200,000 | 18,343 | 7,907 | 532 |
+| Rush Hour | 6 | 21 | gave up at 188,064 | 107,759 | 38,453 | 344 |
 
-Where BFS gave up, its true cost is higher than shown, so the savings above
-are lower bounds. Full table: `analytics/results/benchmark.md` after a run.
+**Solution length: keeper moves** (Showdown pack; the push count is the same in every finished cell of a row)
+
+| Level | Pushes | BFS | A\* | A\* + Deadlock | A\* + Deadlock + Matching |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Aisle Nine | 14 | 40 | 61 | 61 | 37 |
+| Double Stack | 15 | 75 | 54 | 54 | 77 |
+| Tight Turn | 15 | 44 | 45 | 45 | 46 |
+| Long Haul | 19 | 72 | 73 | 73 | 77 |
+| Bottleneck | 16 | 73 | 68 | 68 | 71 |
+| Four-way Stop | 18 | 45 | 63 | 63 | 35 |
+| Dead Stock | 21 | 104 | 117 | 117 | 104 |
+| Backlog | 17 | gave up | 88 | 88 | 93 |
+| Rush Hour | 21 | gave up | 81 | 81 | 87 |
+
+Where an algorithm gave up, its true cost is higher than shown, so the savings
+above are lower bounds. Full table: `analytics/results/benchmark.md` after a run.
 
 ## What changed since Review 1
 

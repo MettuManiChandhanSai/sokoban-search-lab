@@ -28,7 +28,7 @@ from solvers.deadlock import RULES, Deadlocks
 from solvers.solve import ALGORITHMS, BEST, Search
 
 # Budget per search in the browser, where Python runs a few times slower.
-NODE_LIMIT, TIME_LIMIT = 200_000, 15.0
+NODE_LIMIT, TIME_LIMIT = 200_000, 20.0
 
 
 class Game:

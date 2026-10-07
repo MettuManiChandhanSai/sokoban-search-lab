@@ -1,0 +1,10 @@
+; Tight Turn
+; A small room with almost no slack. BFS wades through tens of thousands of positions here.
+#########
+#     @##
+# $$ $$.#
+##  #   #
+##  .#  #
+# .     #
+## .##  #
+#########

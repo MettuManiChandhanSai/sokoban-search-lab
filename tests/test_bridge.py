@@ -23,8 +23,8 @@ class Playing(unittest.TestCase):
         boot = self.game.boot()
         self.assertEqual([a["key"] for a in boot["algorithms"]],
                          ["bfs", "astar", "astar_deadlock", "astar_matching"])
-        self.assertEqual([p["key"] for p in boot["packs"]], ["training", "classic", "warehouse"])
-        self.assertEqual(len(boot["levels"]), 25)
+        self.assertEqual([p["key"] for p in boot["packs"]], ["training", "classic", "warehouse", "showdown"])
+        self.assertEqual(len(boot["levels"]), 34)
         self.assertIn("corner", boot["rules"])
 
     def test_open_describes_the_level_and_the_position(self):

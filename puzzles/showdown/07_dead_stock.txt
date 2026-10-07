@@ -1,0 +1,10 @@
+; Dead Stock
+; Made for the deadlock rules: they discard so many hopeless pushes that A* needs eight times fewer positions.
+##########
+#      #.#
+# . .    #
+# # #$ . #
+#   #@## #
+# $ $$## #
+##       #
+##########

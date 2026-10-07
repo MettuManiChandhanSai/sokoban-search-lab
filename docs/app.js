@@ -23,9 +23,12 @@ const S = {
   clock: { t0: 0, total: 0 },
   par: null, hint: null, notice: null, solvedBy: null,
   raceFor: null, labRan: false, sound: store.get("sound", true), raf: 0,
+  solves: {}, solvesAt: null,               // results of Solve on this level, from one position
+  rows: [],                                 // benchmark rows shown in the Lab
 };
 const board = new Render.Board($("board"));
 const editor = new Render.Board($("editor"));
+let HARD = null;                            // first level of the hardest pack
 const lanes = {};                           // algorithm key -> {root, board, bar, status, nums}
 const STATUS = { solved: "Solved", unsolvable: "No solution", node_limit: "Out of budget", time_limit: "Out of time" };
 
@@ -64,6 +67,7 @@ async function boot() {
     const last = store.get("level", "");
     openLevel(S.boot.levels.some(l => l.id === last) ? last : S.boot.levels[0].id);
     $("boot").hidden = true;
+    $("welcome").hidden = store.get("welcomed", false);
   } catch (err) {
     console.error(err);
     $("boot").classList.add("failed");
@@ -129,6 +133,7 @@ function buildUi() {
   $("matrix").tHead.innerHTML = "<tr><th>Level</th>" + algorithms.map((a, i) =>
     `<th style="--swatch: var(--s${i + 1})"><i></i>${esc(a.label)}</th>`).join("") + "</tr>";
 
+  HARD = levels.find(l => l.pack === packs[packs.length - 1].key);
   wire();
   themeChanged();
   $("sound").textContent = S.sound ? "Sound on" : "Sound off";
@@ -149,6 +154,9 @@ function openLevel(target) {
   Object.assign(board, { heat: new Map(), ghost: null, hint: null, trails: null });
   for (const lane of Object.values(lanes)) resetLane(lane);
   $("verdict").textContent = "";
+  $("score").hidden = $("race-tip").hidden = true;
+  S.solves = {};
+  paintSolves();
 
   $("bay-code").textContent = known ? known.code : "MY";
   let custom = $("level").querySelector("option[data-custom]");
@@ -292,6 +300,8 @@ function hint() {
 function solve() {
   stopPlayback();
   board.heat = new Map();
+  const from = S.view.moves.slice(0, S.view.cursor);       // compare only searches from one position
+  if (from !== S.solvesAt) { S.solves = {}; S.solvesAt = from; }
   S.solving = S.boot.algorithms.find(a => a.key === S.algo);
   call("solve", { algorithm: S.algo });
   S.pending.add("solve");
@@ -336,6 +346,8 @@ const onJob = {
     $("stop").hidden = true;
     $("solve").disabled = false;
     $("readout").textContent = describe(r.result);
+    S.solves[r.result.algorithm] = r.result;
+    paintSolves();
     if (r.result.solved) {
       S.solvedBy = label;
       apply(r.view, false);
@@ -368,11 +380,15 @@ const onJob = {
     if (!r.done) return;
     $("race-go").hidden = false;
     $("race-stop").hidden = true;
-    $("verdict").textContent = verdictOnRace(r.lanes.map(l => l.result));
+    const results = r.lanes.map(l => l.result);
+    $("verdict").textContent = verdictOnRace(results);
+    paintScore(results);
+    $("race-tip").hidden = !(HARD && S.level.pack !== HARD.pack && results[0].solved && results[0].expanded < 1500);
   },
 
   bench(r) {
-    for (const row of r.rows) addBenchRow(row);
+    S.rows.push(...r.rows);
+    if (r.rows.length) paintMatrix();
     $("lab-status").textContent = r.done ? `Finished: ${r.total} levels, ${r.total * S.boot.algorithms.length} searches.`
       : `${r.finished} of ${r.total} levels done. Now solving ${r.current}…`;
     if (!r.done) return;
@@ -411,6 +427,17 @@ function describe(result) {
   if (result.solved) return `${result.label}: solved in ${result.n_pushes} pushes (${result.n_moves} moves). ${cost}${tail}`;
   if (result.status === "unsolvable") return `${result.label}: no solution exists from this position. ${cost}${tail}`;
   return `${result.label}: gave up, out of ${result.status === "node_limit" ? "node budget" : "time"}. ${cost}${tail}`;
+}
+
+const gaveUp = r => !r.solved && r.status !== "unsolvable";
+
+/* What each algorithm needed when you pressed Solve on this level. */
+function paintSolves() {
+  const tried = S.boot.algorithms.map((a, i) => [a, i, S.solves[a.key]]).filter(t => t[2]);
+  $("solves").hidden = !tried.length;
+  $("solves").innerHTML = tried.map(([a, i, r]) => `<li class="${gaveUp(r) ? "gave-up" : ""}" style="--swatch: var(--s${i + 1})" title="${esc(describe(r))}">
+    <b>${esc(a.short)}</b><div class="bar"><i style="width:${logWidth(r.expanded)}"></i></div>
+    <span>${gaveUp(r) ? "over " : ""}${num(r.expanded)} steps${r.solved ? ", " + r.n_moves + " moves" : ""}</span></li>`).join("");
 }
 
 /* ------------------------------------------------------------------ race */
@@ -458,9 +485,34 @@ function verdictOnRace(results) {
     `${best.label} expanded ${num(best.expanded)}, about ${Math.round(bfs.expanded / Math.max(1, best.expanded))} times less work.${knowledge}`;
 }
 
+/* Three small graphs after a race, each on its own linear scale. */
+function paintScore(results) {
+  const done = results.filter(r => r.solved);
+  const routes = new Set(done.map(r => r.n_moves)).size;
+  const charts = [
+    ["Search steps", "Positions each algorithm examined before it finished. Fewer is better.", r => r.expanded, num],
+    ["Solution length", !done.length ? "Nobody found a solution."
+      : routes > 1 ? `Keeper moves in each solution. All of them use ${done[0].n_pushes} pushes, the fewest possible; the routes differ.`
+      : `Keeper moves in each solution. Every algorithm found the same route: ${done[0].n_pushes} pushes.`, r => r.n_moves, v => v + " moves"],
+    ["Time", "How long each search ran.", r => r.time, secs],
+  ];
+  $("score").hidden = false;
+  $("score").innerHTML = charts.map(([title, note, value, show], c) => {
+    const top = Math.max(...results.map(r => value(r) || 0), 1e-9);
+    return `<section class="chart"><h3>${title}</h3><p>${note}</p>` + results.map((r, i) => {
+      const v = value(r), open = gaveUp(r) && c !== 1;
+      return `<div class="chart-row${open ? " gave-up" : ""}" style="--swatch: var(--s${i + 1})" title="${esc(describe(r))}">
+        <b>${esc(S.boot.algorithms[i].short)}</b>
+        <div class="bar"><i style="width:${v == null ? 0 : Math.max(0.6, v / top * 100)}%"></i></div>
+        <span>${v == null ? "none" : (open ? "over " : "") + show(v)}</span></div>`;
+    }).join("") + "</section>";
+  }).join("");
+}
+
 function startRace() {
   for (const lane of Object.values(lanes)) resetLane(lane);
   $("verdict").textContent = "";
+  $("score").hidden = $("race-tip").hidden = true;
   call("race");
   S.pending.add("race");
   S.raceFor = S.level.text;
@@ -477,6 +529,7 @@ function enterRace() {
 /* ------------------------------------------------------------------- lab */
 
 function startLab() {
+  S.rows = [];
   $("matrix").tBodies[0].innerHTML = "";
   $("tiles").innerHTML = "";
   call("benchmark", { pack: $("lab-pack").value || null, seconds: +$("lab-budget").value });
@@ -488,29 +541,38 @@ function startLab() {
   kick();
 }
 
-function addBenchRow(row) {
-  const body = $("matrix").tBodies[0], known = S.boot.levels.find(l => l.id === row.level);
-  let tr = body.querySelector(`tr[data-level="${row.level}"]`);
-  if (!tr) {
-    if (!body.querySelector(`tr[data-pack="${known.pack}"]`)) {
-      const head = body.insertRow();
-      head.className = "pack-row";
-      head.dataset.pack = known.pack;
-      head.innerHTML = `<th colspan="5">${esc(S.boot.packs.find(p => p.key === known.pack).name)}</th>`;
+/* The Lab table, rebuilt from S.rows for whichever measure is selected. */
+const MEASURES = {
+  expanded: { width: r => logWidth(r.expanded), text: r => (gaveUp(r) ? "&gt;" : "") + num(r.expanded) },
+  time: { width: r => Math.min(100, Math.log10(Math.max(1, r.time * 1e4)) / 6 * 100) + "%",      // 0.1 ms .. 100 s
+          text: r => (gaveUp(r) ? "&gt;" : "") + secs(r.time) },
+  n_moves: { width: (r, top) => (r.solved ? r.n_moves / top * 100 : 0) + "%", text: r => r.solved ? r.n_moves : "&ndash;" },
+  n_pushes: { width: (r, top) => (r.solved ? r.n_pushes / top * 100 : 0) + "%", text: r => r.solved ? r.n_pushes : "&ndash;" },
+};
+
+function paintMatrix() {
+  const key = $("lab-metric").value, measure = MEASURES[key];
+  const top = Math.max(1, ...S.rows.map(r => r[key] || 0));
+  let html = "", pack = null, level = null;
+  for (const row of S.rows) {
+    const known = S.boot.levels.find(l => l.id === row.level);
+    if (known.pack !== pack) {
+      pack = known.pack;
+      html += `<tr class="pack-row"><th colspan="5">${esc(S.boot.packs.find(p => p.key === pack).name)}</th></tr>`;
     }
-    tr = body.insertRow();
-    tr.dataset.level = row.level;
-    tr.innerHTML = `<th scope="row">${esc(row.title)}<small>${known.code} · ${row.crates} crate${row.crates > 1 ? "s" : ""}</small></th>`;
+    if (row.level !== level) {
+      level = row.level;
+      html += `<tr><th scope="row">${esc(row.title)}<small>${known.code} \u00b7 ${row.crates} crate${row.crates > 1 ? "s" : ""}</small></th>`;
+    }
+    const i = S.boot.algorithms.findIndex(a => a.key === row.algorithm);
+    const tip = `${row.label} on ${row.title}: ${STATUS[row.status].toLowerCase()}` +
+      (row.solved ? `, ${row.n_pushes} pushes, ${row.n_moves} moves` : "") +
+      `. ${num(row.expanded)} expanded, ${num(row.generated)} generated, ${secs(row.time)}.`;
+    html += `<td style="--swatch: var(--s${i + 1})" title="${esc(tip)}"><div class="cell${gaveUp(row) ? " gave-up" : ""}">
+      <div class="bar"><i style="width:${measure.width(row, top)}"></i></div><span>${measure.text(row)}</span></div></td>`;
+    if (i === S.boot.algorithms.length - 1) html += "</tr>";
   }
-  const i = S.boot.algorithms.findIndex(a => a.key === row.algorithm);
-  const gaveUp = !row.solved && row.status !== "unsolvable";
-  const td = tr.insertCell();
-  td.style.setProperty("--swatch", `var(--s${i + 1})`);
-  td.title = `${row.label} on ${row.title}: ${STATUS[row.status].toLowerCase()}` +
-    (row.solved ? `, ${row.n_pushes} pushes, ${row.n_moves} moves` : "") +
-    `. ${num(row.expanded)} expanded, ${num(row.generated)} generated, ${secs(row.time)}.`;
-  td.innerHTML = `<div class="cell${gaveUp ? " gave-up" : ""}"><div class="bar"><i style="width:${logWidth(row.expanded)}"></i></div>
-    <span>${gaveUp ? "&gt;" : ""}${num(row.expanded)}</span></div>`;
+  $("matrix").tBodies[0].innerHTML = html;
 }
 
 async function copyReport(format) {
@@ -627,7 +689,7 @@ function setMode(mode) {
   $("app").dataset.mode = mode;
   for (const button of document.querySelectorAll(".modes button"))
     button.toggleAttribute("aria-current", button.dataset.mode === mode);
-  for (const name of ["play", "race", "lab", "build"]) $("view-" + name).hidden = name !== mode;
+  for (const name of ["play", "race", "lab", "build", "guide"]) $("view-" + name).hidden = name !== mode;
   if (mode === "play") { board.resize(); kick(); }
   if (mode === "race") enterRace();
   if (mode === "lab" && !S.labRan) startLab();
@@ -654,6 +716,12 @@ function wire() {
   $("o-trace").onchange = e => { if (!e.target.checked) { board.heat = new Map(); board.ghost = null; } paintPanel(); kick(); };
   $("o-paths").onchange = e => { board.trails = e.target.checked ? call("trails") : null; paintPanel(); kick(); };
 
+  $("to-race").onclick = () => setMode("race");
+  $("race-harder").onclick = () => openLevel(HARD.id);
+  $("lab-metric").onchange = paintMatrix;
+  const welcomed = guide => { $("welcome").hidden = true; store.set("welcomed", true); if (guide) setMode("guide"); };
+  $("welcome-go").onclick = () => welcomed(false);
+  $("welcome-guide").onclick = () => welcomed(true);
   $("race-go").onclick = startRace;
   $("race-stop").onclick = () => call("cancel", { job: "race" });
   $("lab-go").onclick = startLab;
@@ -676,6 +744,7 @@ function wire() {
   const keys = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R", w: "U", s: "D", a: "L", d: "R" };
   addEventListener("keydown", e => {
     if (S.mode !== "play" || !S.view || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!$("welcome").hidden) $("welcome-go").click();
     const on = selector => e.target instanceof Element && e.target.matches(selector);
     if (on("input:not([type=checkbox]):not([type=radio]), select, textarea")) return;
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;

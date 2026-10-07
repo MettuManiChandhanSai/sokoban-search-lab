@@ -1,0 +1,10 @@
+; Double Stack
+; Three different routes to the same 15 pushes: compare the Solution length graph after a race.
+##########
+#    #  ##
+#. . # $ #
+# $$ #   #
+#   #    #
+#  $  .  #
+###@#  #.#
+##########
