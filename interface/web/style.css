@@ -251,7 +251,7 @@ textarea { width: 100%; border: 1px solid var(--line); background: var(--surface
 
 /* ------------------------------------------------------------ race & lab */
 #view-race, #view-lab, #view-guide { overflow-y: auto; }
-#view-race:not([hidden]), #view-lab:not([hidden]) { display: grid; gap: 12px; align-content: start; }
+#view-race:not([hidden]), #view-lab:not([hidden]) { display: grid; gap: 12px; align-content: start; grid-auto-rows: max-content; }
 .race-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
 .race-head h2 { font: 600 22px/1.2 var(--label); letter-spacing: .03em; text-transform: none; text-wrap: balance; }
 .lede { color: var(--ink-2); max-width: 65ch; }
