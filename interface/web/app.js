@@ -33,13 +33,28 @@ const STATUS = { solved: "Solved", unsolvable: "No solution", node_limit: "Out o
 
 async function boot() {
   const say = (text, pct) => { $("boot-text").textContent = text; $("boot-bar").style.width = pct + "%"; };
+  const load = async name => {
+    const reply = await fetch(name);
+    if (!reply.ok) throw new Error(`${name}: HTTP ${reply.status}`);
+    return reply.json();
+  };
   try {
-    say("Loading the Python runtime…", 20);
+    say("Loading the Python standard library…", 15);
+    // Pyodide asks for its standard library as a zip. The site ships it as
+    // plain text, so pack it here and hand it over when the request comes.
+    const stdlib = zipOf(await load("pyodide/python_stdlib.json"));
+    const realFetch = window.fetch;
+    window.fetch = (url, ...rest) => String(url.url || url).endsWith("python_stdlib.zip")
+      ? Promise.resolve(new Response(stdlib)) : realFetch(url, ...rest);
+    say("Starting Python…", 45);
     const py = await loadPyodide({ indexURL: new URL("pyodide/", document.baseURI).href });
-    say("Unpacking the solver modules…", 75);
-    const bundle = await fetch("app.zip");
-    if (!bundle.ok) throw new Error("app.zip: HTTP " + bundle.status);
-    py.unpackArchive(await bundle.arrayBuffer(), "zip", { extractDir: "/app" });
+    window.fetch = realFetch;
+
+    say("Loading the solver modules…", 80);
+    for (const [path, text] of Object.entries(await load("app.json"))) {
+      py.FS.mkdirTree("/app/" + path.slice(0, path.lastIndexOf("/")));
+      py.FS.writeFile("/app/" + path, text);
+    }
     py.runPython("import sys; sys.path.insert(0, '/app')");
     const bridge = py.pyimport("interface.bridge");
     call = (method, args = {}) => JSON.parse(bridge.call(method, JSON.stringify(args)));
@@ -55,6 +70,30 @@ async function boot() {
     say("The Python runtime could not start.", 100);
     $("boot").querySelector(".fine").textContent = String(err.message || err);
   }
+}
+
+/* A zip archive (stored, not compressed) of {path: text}. */
+function zipOf(files) {
+  const table = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xEDB88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
+  const crc = bytes => { let c = -1; for (const b of bytes) c = table[(c ^ b) & 255] ^ (c >>> 8); return ~c >>> 0; };
+  const text = new TextEncoder(), parts = [], directory = [];
+  let offset = 0;
+  const record = (signature, ...fields) => {      // fields: [size in bytes, value]
+    const view = new DataView(new ArrayBuffer(4 + fields.reduce((n, [size]) => n + size, 0)));
+    view.setUint32(0, signature, true);
+    let at = 4;
+    for (const [size, value] of fields) { size === 2 ? view.setUint16(at, value, true) : view.setUint32(at, value, true); at += size; }
+    return new Uint8Array(view.buffer);
+  };
+  for (const [path, source] of Object.entries(files)) {
+    const name = text.encode(path), data = text.encode(source);
+    const common = [[2, 20], [2, 0x800], [2, 0], [2, 0], [2, 0x21], [4, crc(data)], [4, data.length], [4, data.length], [2, name.length], [2, 0]];
+    parts.push(record(0x04034b50, ...common), name, data);
+    directory.push(record(0x02014b50, [2, 20], ...common, [2, 0], [2, 0], [2, 0], [4, 0], [4, offset]), name);
+    offset += 30 + name.length + data.length;
+  }
+  const size = directory.reduce((n, part) => n + part.length, 0), count = directory.length / 2;
+  return new Blob([...parts, ...directory, record(0x06054b50, [2, 0], [2, 0], [2, count], [2, count], [4, size], [4, offset], [2, 0])]);
 }
 
 function buildUi() {
@@ -103,7 +142,8 @@ function openLevel(target) {
   if (view.error) return view.error;
   const known = S.boot.levels.find(l => l.id === view.level.id);
   Object.assign(S, { level: view.level, view: null, par: null, hint: null, notice: null, solvedBy: null,
-    playing: false, script: "", solving: null, raceFor: null, pending: new Set(["par"]) });
+    playing: false, script: "", solving: null, raceFor: null });
+  S.pending.add("par");
   S.clock = { t0: 0, total: 0 };
   board.setLevel(view.level);
   Object.assign(board, { heat: new Map(), ghost: null, hint: null, trails: null });
@@ -354,8 +394,15 @@ function pump() {
     const report = reports[name];
     if (!report || report.done) S.pending.delete(name);
     if (report) onJob[name](report);
+    else if (onGone[name]) onGone[name]();      // cancelled, or dropped by a move or a new level
   }
 }
+
+const onGone = {
+  solve() { board.ghost = null; $("stop").hidden = true; $("solve").disabled = false; $("readout").textContent = "Search stopped."; },
+  race() { $("race-go").hidden = false; $("race-stop").hidden = true; },
+  bench() { $("lab-go").hidden = false; $("lab-stop").hidden = true; $("lab-status").textContent = "Stopped."; },
+};
 
 function describe(result) {
   const cost = `${num(result.expanded)} positions expanded, ${num(result.generated)} generated, ${secs(result.time)}`;
@@ -600,7 +647,7 @@ function wire() {
   $("scrub").oninput = e => seek(+e.target.value);
   $("hint").onclick = hint;
   $("solve").onclick = solve;
-  $("stop").onclick = () => { call("cancel", { job: "solve" }); board.ghost = null; $("stop").hidden = true; $("solve").disabled = false; $("readout").textContent = "Stopped."; };
+  $("stop").onclick = () => call("cancel", { job: "solve" });
   $("algos").onchange = e => pickAlgo(e.target.value);
   for (const button of document.querySelectorAll("[data-move]")) button.onclick = () => move(button.dataset.move);
   $("o-dead").onchange = e => { board.showDead = e.target.checked; paintPanel(); kick(); };
@@ -608,9 +655,9 @@ function wire() {
   $("o-paths").onchange = e => { board.trails = e.target.checked ? call("trails") : null; paintPanel(); kick(); };
 
   $("race-go").onclick = startRace;
-  $("race-stop").onclick = () => { call("cancel", { job: "race" }); $("race-go").hidden = false; $("race-stop").hidden = true; };
+  $("race-stop").onclick = () => call("cancel", { job: "race" });
   $("lab-go").onclick = startLab;
-  $("lab-stop").onclick = () => { call("cancel", { job: "bench" }); $("lab-go").hidden = false; $("lab-stop").hidden = true; $("lab-status").textContent = "Stopped."; };
+  $("lab-stop").onclick = () => call("cancel", { job: "bench" });
   $("copy-csv").onclick = () => copyReport("csv");
   $("copy-md").onclick = () => copyReport("markdown");
 

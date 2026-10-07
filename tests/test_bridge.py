@@ -128,6 +128,17 @@ class Jobs(unittest.TestCase):
         self.assertIn("First Push", self.game.report(format="csv"))
         self.assertTrue(self.game.report(format="markdown").startswith("| Level"))
 
+    def test_opening_a_level_stops_its_searches_but_not_the_benchmark(self):
+        self.game.race()
+        self.game.benchmark(pack="training", seconds=1)
+        self.game.open(id="training/01_first_push")
+        self.assertEqual(set(self.game.jobs), {"bench", "par"})
+
+    def test_a_move_cancels_a_running_solve(self):
+        self.game.solve(algorithm="bfs")
+        self.game.move("D")
+        self.assertNotIn("solve", self.game.tick(2)["jobs"])
+
     def test_trails_for_the_human_vs_ai_overlay(self):
         finish(self.game, "par")
         self.game.move("D")

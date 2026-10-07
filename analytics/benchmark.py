@@ -61,13 +61,13 @@ def main(argv=None):
 
     levels = [e for e in catalog() if args.pack in (None, e["pack"])]
     bench = Benchmark(levels, node_limit=args.node_limit, time_limit=args.time_limit)
-    printed = 0
-    print(table([]))
-    while not bench.advance(0.5) or printed < len(bench.rows):
-        for line in table(bench.rows).splitlines()[2 + printed:]:
-            print(line, flush=True)
-        printed = len(bench.rows)
+    seen = 0
+    while not bench.advance(0.5) or seen < len(bench.rows):
+        for row in bench.rows[seen::len(ALGORITHMS)]:
+            print(f"  finished {row['title']}", flush=True)
+        seen = len(bench.rows)
 
+    print("\n" + table(bench.rows))
     print("\n" + summary_table(bench.rows))
     RESULTS.mkdir(exist_ok=True)
     (RESULTS / "benchmark.csv").write_text(to_csv(bench.rows), encoding="utf-8")

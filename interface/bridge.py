@@ -62,7 +62,9 @@ class Game:
         self.ai_from = None         # timeline index where the AI's moves begin
         self.hints = 0
         self.par = None             # the AI's optimum from the start position
-        self.jobs = {"par": Search(self.level, start, BEST, NODE_LIMIT, 5.0)}
+        # a new level ends the searches on the old one; a running benchmark carries on
+        self.jobs = {name: job for name, job in self.jobs.items() if name == "bench"}
+        self.jobs["par"] = Search(self.level, start, BEST, NODE_LIMIT, 5.0)
         level = self.level
         return {**self.view(), "level": {
             "id": entry["id"], "pack": entry["pack"], "note": entry["note"],
