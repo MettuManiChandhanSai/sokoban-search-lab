@@ -1,0 +1,12 @@
+; Partition II
+; The same hall with a longer partition.
+###############
+#.     #     .#
+#  $   #  $   #
+#      #      #
+#   #####     #
+#      #      #
+#.  $  #   $ .#
+#      #      #
+#     @       #
+###############

@@ -1,0 +1,11 @@
+; Storeroom
+; Three crates around inner walls. The headline comparison: watch how many positions each algorithm needs.
+#########
+#       #
+#  $  $ #
+#   ##  #
+#  $    #
+# # ##  #
+#  .  . #
+# .   @ #
+#########

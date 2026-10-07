@@ -20,7 +20,7 @@ layer on top of A*, not a different search.
 from heapq import heappop, heappush
 from itertools import count
 
-from engine.state import State, legal_pushes, push, reachable
+from engine.state import arrivals, legal_pushes, push, reachable
 
 from .bfs import REPORT_EVERY, trace
 
@@ -35,26 +35,25 @@ def astar(level, start, stats, heuristic, deadlocks=None):
         pruned[deadlocks.check_state(start.boxes)[0]] += 1
         return None
 
-    parents = {}                    # expanded state -> (parent state, push that led here)
-    best_g = {start: 0}             # cheapest known way to reach each position
-    order = count()                 # tie-breaker: the heap never compares states
-    frontier = [(h, h, next(order), 0, start, None, None)]
+    parents = {start: (None, None)}     # position -> (parent, push), for its best known path
+    best_g = {start: 0}                 # fewest pushes known to reach each position
+    closed = set()                      # every way of arriving in an expanded state
+    order = count()                     # tie-breaker: the heap never compares states
+    frontier = [(h, h, next(order), 0, start)]
 
     while frontier:
-        _, h, _, g, position, parent, via = heappop(frontier)
-
+        _, h, _, g, position = heappop(frontier)
+        if position in closed or g > best_g[position]:
+            continue                    # expanded already, or a stale heap entry
+        if position.boxes == level.goals:           # goal test on expansion: optimal
+            return trace(parents, position)
         region = reachable(level, position.boxes, position.player)
-        state = State(min(region), position.boxes)
-        if state in parents:        # already expanded via a path at least as short
-            continue
-        parents[state] = (parent, via)
-        if state.boxes == level.goals:              # goal test on expansion: optimal
-            return trace(parents, state)
+        closed.update(arrivals(level, position.boxes, region))
         stats["expanded"] += 1
 
-        for box, step in legal_pushes(level, state.boxes, region):
-            child = push(state.boxes, box, step)
-            if best_g.get(child, g + 2) <= g + 1:
+        for box, step in legal_pushes(level, position.boxes, region):
+            child = push(position.boxes, box, step)
+            if child in closed or best_g.get(child, g + 2) <= g + 1:
                 continue
             if deadlocks:
                 rule = deadlocks.after_push(child.boxes, box + step)
@@ -66,11 +65,11 @@ def astar(level, start, stats, heuristic, deadlocks=None):
                 pruned["matching"] += 1
                 continue
             best_g[child] = g + 1
+            parents[child] = (position, (box, step))
             stats["generated"] += 1
-            heappush(frontier, (g + 1 + child_h, child_h, next(order),
-                                g + 1, child, state, (box, step)))
+            heappush(frontier, (g + 1 + child_h, child_h, next(order), g + 1, child))
 
         if not stats["expanded"] % REPORT_EVERY:
-            stats.update(frontier=len(frontier), depth=g, state=state)
+            stats.update(frontier=len(frontier), depth=g, state=position)
             yield
     return None

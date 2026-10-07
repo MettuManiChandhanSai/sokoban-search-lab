@@ -1,0 +1,10 @@
+; Divider
+; A wall splits the room; each crate has its own side.
+#########
+#   #   #
+# $ # . #
+#   #   #
+# . # $ #
+#   #   #
+#  @    #
+#########

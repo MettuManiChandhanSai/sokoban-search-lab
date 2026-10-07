@@ -1,0 +1,11 @@
+; Round the Pillar
+; One crate, one pillar. Play it yourself, then compare your route with the AI's.
+#############
+#           #
+#   #####   #
+#   #####   #
+#     $     #
+#   #####   #
+#   #####  .#
+#     @     #
+#############

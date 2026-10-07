@@ -1,0 +1,12 @@
+; Partition
+; A long partition with one doorway. Large and open.
+###############
+#.     #     .#
+#  $   #      #
+#      #  $   #
+#   ####      #
+#      #      #
+#.  $  #  $  .#
+#      #      #
+#     @       #
+###############

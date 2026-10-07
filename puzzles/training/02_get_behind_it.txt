@@ -1,0 +1,7 @@
+; Get Behind It
+; You can push but never pull. Walk round to the far side of the crate first.
+########
+#      #
+# .@$  #
+#      #
+########

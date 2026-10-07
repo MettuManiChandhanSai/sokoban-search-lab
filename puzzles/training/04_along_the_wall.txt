@@ -1,0 +1,8 @@
+; Along the Wall
+; A crate against a wall can only slide along it. Fine when a goal lies on that wall, fatal when none does.
+########
+#      #
+# $    #
+#      #
+#@    .#
+########

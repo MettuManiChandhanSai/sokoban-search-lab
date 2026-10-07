@@ -81,6 +81,21 @@ def legal_pushes(level, boxes, region):
             and box + step in floor and box + step not in boxes]
 
 
+def arrivals(level, boxes, region):
+    """Every position that is the same search state as "these crates, keeper
+    anywhere in `region`".
+
+    Walking is free, so two positions with the same crates whose keepers
+    can reach each other are one state. A push always leaves the keeper
+    next to a crate, so it is enough to list the cells of `region` that
+    touch one. Marking them all when a state is expanded means the search
+    never expands, or even flood-fills, the same state twice.
+    """
+    neighbours = level.neighbours
+    return [State(cell, boxes)
+            for box in boxes for cell in neighbours[box] if cell in region]
+
+
 def push(boxes, box, step):
     """The state right after pushing `box` one cell: the keeper ends up
     where the crate was."""

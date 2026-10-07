@@ -1,0 +1,10 @@
+; Side Rooms
+; Three crates, two rooms joined along the bottom.
+##########
+#    #   #
+# $  #.$ #
+#    #   #
+#.   ##  #
+#  $   . #
+#   @    #
+##########

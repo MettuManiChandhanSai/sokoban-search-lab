@@ -1,0 +1,7 @@
+; Dead-end Lane
+; Three goals in a lane with no way out. Race the algorithms on this one: each rung of the ladder cuts the search again.
+#########
+#@      #####
+# $ $ $ ...#
+#       #####
+#########

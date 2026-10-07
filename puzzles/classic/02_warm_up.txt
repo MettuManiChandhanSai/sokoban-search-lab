@@ -1,0 +1,9 @@
+; Warm-up
+; Two crates in an open room.
+########
+#      #
+#  $ $ #
+#  .   #
+#     .#
+#  @   #
+########

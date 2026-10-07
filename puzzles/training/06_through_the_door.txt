@@ -1,0 +1,8 @@
+; Through the Door
+; Crates leave the room one at a time, and the first one must not block the second goal.
+##########
+#   #    #
+# $ # .  #
+# $   .  #
+#@  #    #
+##########

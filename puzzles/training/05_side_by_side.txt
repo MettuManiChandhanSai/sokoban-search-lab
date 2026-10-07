@@ -1,0 +1,8 @@
+; Side by Side
+; Two crates pressed together against a wall hold each other in place for ever. Send them up one at a time.
+#########
+#.     .#
+#       #
+#  $$   #
+#   @   #
+#########

@@ -1,0 +1,8 @@
+; Corner Trap
+; A crate in a corner is stuck for good. Switch on Dead squares to see every square a crate must never touch.
+#######
+#.    #
+#     #
+#  $  #
+#    @#
+#######

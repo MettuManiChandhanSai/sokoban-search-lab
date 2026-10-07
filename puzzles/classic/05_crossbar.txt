@@ -1,0 +1,10 @@
+; Crossbar
+; Four crates mirrored around a central bar.
+###########
+#  .   .  #
+#  $   $  #
+#   ###   #
+#  $   $  #
+#  .   .  #
+#    @    #
+###########

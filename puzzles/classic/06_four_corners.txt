@@ -1,0 +1,11 @@
+; Four Corners
+; Every goal sits in a corner of a wide hall. Open space is where blind search drowns.
+############
+#.        .#
+#  $    $  #
+#          #
+#    ##    #
+#          #
+#  $    $  #
+#.   @    .#
+############
