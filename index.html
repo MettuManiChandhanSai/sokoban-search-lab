@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Sokoban Search Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Saira+Stencil+One&display=swap">
+<link rel="stylesheet" href="style.css">
+
+<div class="app" id="app" data-mode="play">
+
+  <header class="top">
+    <h1 class="wordmark">Sokoban <span>Search Lab</span></h1>
+    <nav class="modes" aria-label="Sections">
+      <button type="button" data-mode="play" aria-current="page">Play</button>
+      <button type="button" data-mode="race">Race</button>
+      <button type="button" data-mode="lab">Lab</button>
+      <button type="button" data-mode="build">Build</button>
+      <button type="button" data-mode="guide">Guide</button>
+    </nav>
+    <div class="tools">
+      <button type="button" id="sound" class="ghost" aria-pressed="true">Sound on</button>
+      <button type="button" id="theme" class="ghost">Night shift</button>
+    </div>
+  </header>
+
+  <!-- Bay label: which level is on the floor. Shown in Play and Race. -->
+  <section class="bay" id="bay" aria-label="Level">
+    <button type="button" id="prev" class="step" aria-label="Previous level">&#9664;</button>
+    <div class="bay-code" id="bay-code">T-01</div>
+    <div class="bay-text">
+      <label class="visually-hidden" for="level">Level</label>
+      <select id="level"></select>
+      <p id="note" class="note"></p>
+    </div>
+    <button type="button" id="next" class="step" aria-label="Next level">&#9654;</button>
+  </section>
+
+  <!-- ============================== PLAY ============================== -->
+  <main class="view" id="view-play">
+    <div class="floor" id="floor">
+      <canvas id="board" tabindex="0" aria-label="Sokoban board. Use the arrow keys to move."></canvas>
+      <div class="tip" id="tip" hidden></div>
+      <div class="banner" id="banner" hidden>
+        <strong id="banner-title"></strong>
+        <span id="banner-text"></span>
+      </div>
+      <div class="boot" id="welcome" hidden>
+        <div class="boot-card">
+          <p class="eyebrow">New here?</p>
+          <p class="welcome-title">Push every crate onto a goal.</p>
+          <ol class="steps">
+            <li><b>Play.</b> Arrow keys or WASD move the keeper. You can push a crate but never pull it. <kbd>Z</kbd> takes a move back.</li>
+            <li><b>Get help.</b> Hint marks the best next push. A warning appears the moment a level can no longer be won.</li>
+            <li><b>Watch the AI.</b> Choose an algorithm under Solver and press Solve. You see it search, then it plays its answer.</li>
+            <li><b>Compare.</b> Race runs all four algorithms on the same level and graphs how much work each one needed.</li>
+          </ol>
+          <div class="row">
+            <button type="button" id="welcome-go" class="primary">Start playing</button>
+            <button type="button" id="welcome-guide">Read the guide</button>
+          </div>
+          <p class="fine">Every box on the right has a "How this works" line that explains its buttons.</p>
+        </div>
+      </div>
+      <div class="boot" id="boot">
+        <div class="boot-card">
+          <p class="eyebrow">Starting up</p>
+          <p id="boot-text">Loading the Python runtime&hellip;</p>
+          <div class="boot-bar"><i id="boot-bar"></i></div>
+          <p class="fine">The solvers on this page are the project's own Python modules, running in your browser through WebAssembly.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <section class="block">
+        <h2>Your run</h2>
+        <dl class="stats">
+          <div><dt>Pushes</dt><dd id="s-pushes">0</dd></div>
+          <div><dt>Moves</dt><dd id="s-moves">0</dd></div>
+          <div><dt>Time</dt><dd id="s-time">0:00</dd></div>
+          <div><dt>AI best</dt><dd id="s-par" title="Fewest pushes possible, found by the solver">&ndash;</dd></div>
+        </dl>
+        <div class="row">
+          <button type="button" id="undo" title="Z">Undo</button>
+          <button type="button" id="redo" title="Y">Redo</button>
+          <button type="button" id="restart" title="R">Restart</button>
+          <button type="button" id="hint" title="H">Hint</button>
+        </div>
+        <p class="result" id="result" hidden></p>
+        <div class="dpad" aria-label="Move">
+          <button type="button" data-move="U" aria-label="Up">&#9650;</button>
+          <button type="button" data-move="L" aria-label="Left">&#9664;</button>
+          <button type="button" data-move="D" aria-label="Down">&#9660;</button>
+          <button type="button" data-move="R" aria-label="Right">&#9654;</button>
+        </div>
+        <details class="help">
+          <summary>How this works</summary>
+          <dl>
+            <dt>Pushes</dt><dd>How many times you moved a crate one square. This is the score: fewer is better.</dd>
+            <dt>Moves</dt><dd>Every step the keeper took, walking included.</dd>
+            <dt>Time</dt><dd>Starts with your first move and stops when the level is solved.</dd>
+            <dt>AI best</dt><dd>The fewest pushes any solution can have, worked out by the solver when the level opens. "none" means the level cannot be solved; "?" means the solver ran out of time.</dd>
+            <dt>Undo, Redo</dt><dd>Step back and forward through your moves (<kbd>Z</kbd>, <kbd>Y</kbd>).</dd>
+            <dt>Restart</dt><dd>Back to the start (<kbd>R</kbd>). Your moves stay on the timeline, so Redo brings them back.</dd>
+            <dt>Hint</dt><dd>The solver looks for the best next push from where you stand and marks it with an arrow. Press Hint again (<kbd>H</kbd>) and the keeper carries it out.</dd>
+          </dl>
+        </details>
+      </section>
+
+      <section class="block">
+        <h2>Show on the floor</h2>
+        <div class="chips">
+          <label><input type="checkbox" id="o-dead"> Dead squares</label>
+          <label><input type="checkbox" id="o-trace" checked> Search trace</label>
+          <label><input type="checkbox" id="o-paths"> Your path vs AI</label>
+        </div>
+        <p class="fine" id="legend"></p>
+        <details class="help">
+          <summary>How this works</summary>
+          <dl>
+            <dt>Dead squares</dt><dd>Hatches every square from which a crate can never reach a goal. Push a crate onto one and the level is lost. Point at a hatched square to see which rule condemns it.</dd>
+            <dt>Search trace</dt><dd>While a solver runs, dashed outlines show the position it is examining and an orange tint builds up wherever it has tried a crate. A wide orange stain means a lot of wasted work.</dd>
+            <dt>Your path vs AI</dt><dd>Draws the route you have walked and the route of an optimal solution, so you can see where they part.</dd>
+          </dl>
+        </details>
+      </section>
+
+      <section class="block">
+        <h2>Solver</h2>
+        <div class="algos" id="algos" role="radiogroup" aria-label="Algorithm"></div>
+        <p class="fine" id="algo-idea"></p>
+        <div class="row">
+          <button type="button" id="solve" class="primary">Solve from here</button>
+          <button type="button" id="stop" hidden>Stop</button>
+        </div>
+        <p class="readout" id="readout" aria-live="polite">Pick an algorithm and press Solve. The answer is added to the timeline below.</p>
+        <ul class="solves" id="solves" hidden></ul>
+        <div class="row">
+          <button type="button" id="to-race">Race all four on this level</button>
+        </div>
+        <details class="help">
+          <summary>How this works</summary>
+          <dl>
+            <dt>The four buttons</dt><dd>Choose who searches. BFS tries everything in order. A* uses a distance estimate to head for the goals. A* + DL also refuses pushes that deadlock rules prove hopeless. A* + DL + M uses a sharper estimate that gives every crate its own goal.</dd>
+            <dt>Solve from here</dt><dd>Searches from the position on the floor right now, not from the start, so it works after you have made moves. The solution is added to the timeline and played.</dd>
+            <dt>Positions expanded</dt><dd>How many positions the algorithm took out and examined. These are its search steps, the fairest measure of its work.</dd>
+            <dt>Generated, waiting</dt><dd>Generated counts every new position it discovered. Waiting is how many of those are still queued.</dd>
+            <dt>Pushes deep</dt><dd>How many pushes from the start the position under examination is.</dd>
+            <dt>Discarded as hopeless</dt><dd>Pushes a deadlock rule threw away before they were ever searched.</dd>
+            <dt>The list below the button</dt><dd>Each algorithm you try on this level is added, so you can compare their search steps and the solution each one found.</dd>
+          </dl>
+        </details>
+      </section>
+
+      <section class="block">
+        <h2>Timeline</h2>
+        <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Position in the move list">
+        <div class="row">
+          <button type="button" id="t-start" aria-label="Back to start">&#9198;</button>
+          <button type="button" id="t-back" aria-label="Step back">&#9664;</button>
+          <button type="button" id="t-play" class="primary">Play</button>
+          <button type="button" id="t-fwd" aria-label="Step forward">&#9654;</button>
+          <label class="speed">Speed
+            <select id="speed">
+              <option value="3">Slow</option>
+              <option value="8" selected>Normal</option>
+              <option value="20">Fast</option>
+              <option value="60">Blur</option>
+            </select>
+          </label>
+        </div>
+        <p class="fine mono" id="lurd"></p>
+        <details class="help">
+          <summary>How this works</summary>
+          <dl>
+            <dt>The slider</dt><dd>Every move, yours and the solver's, sits on one line. Drag to jump to any point.</dd>
+            <dt>The buttons</dt><dd>Back to the start, one step back, play or pause (<kbd>Space</kbd>), one step forward. Speed sets how fast Play runs.</dd>
+            <dt>The letters</dt><dd>The move list: <code>u d l r</code> are steps up, down, left and right. Lower case is a walk, UPPER CASE is a push.</dd>
+          </dl>
+        </details>
+      </section>
+    </aside>
+  </main>
+
+  <!-- ============================== RACE ============================== -->
+  <main class="view" id="view-race" hidden>
+    <div class="race-head">
+      <div>
+        <h2>Four algorithms, one level, same start</h2>
+        <p class="lede">Each lane shows the position that algorithm is examining right now. The bar counts the positions it has expanded, on a log scale: every tick is ten times more work.</p>
+      </div>
+      <div class="row">
+        <button type="button" id="race-go" class="primary">Start race</button>
+        <button type="button" id="race-stop" hidden>Stop</button>
+      </div>
+    </div>
+    <details class="help">
+      <summary>How to read the race</summary>
+      <dl>
+        <dt>The small board</dt><dd>The position that algorithm is looking at this instant. BFS jumps all over the room; the informed searches stay near the goals.</dd>
+        <dt>The bar</dt><dd>Positions expanded so far: the algorithm's search steps. The scale is logarithmic, so a bar one tick longer did ten times the work.</dd>
+        <dt>Solved, Out of time</dt><dd>Every search gets the same budget. An algorithm that runs out gives up, and its count is then a minimum.</dd>
+        <dt>The three graphs</dt><dd>After the race: search steps, the length of each solution, and time, each on a plain linear scale so the gaps look as large as they are.</dd>
+        <dt>Same pushes for everyone?</dt><dd>Yes, by design. All four are guaranteed to find the fewest pushes. They differ in how much they search to get there, and in how far the keeper walks, because several solutions can share the same push count.</dd>
+      </dl>
+    </details>
+    <div class="lanes" id="lanes"></div>
+    <p class="verdict" id="verdict" aria-live="polite"></p>
+    <p class="race-tip" id="race-tip" hidden>
+      <span>This level is small, so the four barely differ.</span>
+      <button type="button" id="race-harder">Race them on a hard level</button>
+    </p>
+    <div class="score" id="score" hidden></div>
+  </main>
+
+  <!-- =============================== LAB ============================== -->
+  <main class="view" id="view-lab" hidden>
+    <div class="race-head">
+      <div>
+        <h2>Benchmark</h2>
+        <p class="lede">Every algorithm on every level, from the same start position. Choose what the cells show. A hollow bar means the search ran out of budget.</p>
+      </div>
+      <div class="row">
+        <label>Pack <select id="lab-pack"></select></label>
+        <label>Budget per search
+          <select id="lab-budget">
+            <option value="3">3 seconds</option>
+            <option value="10" selected>10 seconds</option>
+            <option value="20">20 seconds</option>
+          </select>
+        </label>
+        <label>Show
+          <select id="lab-metric">
+            <option value="expanded">Search steps (positions expanded)</option>
+            <option value="n_moves">Solution length (keeper moves)</option>
+            <option value="n_pushes">Solution pushes</option>
+            <option value="time">Time</option>
+          </select>
+        </label>
+        <button type="button" id="lab-go" class="primary">Run benchmark</button>
+        <button type="button" id="lab-stop" hidden>Stop</button>
+      </div>
+    </div>
+    <details class="help">
+      <summary>How to read the benchmark</summary>
+      <dl>
+        <dt>Pack, Budget</dt><dd>Which levels to run, and how long each search may take before it gives up. A bigger budget lets BFS finish more levels and takes longer.</dd>
+        <dt>Show</dt><dd>What the cells display. Search steps is the work done. Solution length is how many keeper moves the answer takes. Pushes is the same in every finished cell of a row, which is the proof that all four are optimal.</dd>
+        <dt>The tiles</dt><dd>Totals for each algorithm over the whole run, and its typical saving against BFS.</dd>
+        <dt>Copy</dt><dd>Puts the full table (every column) on the clipboard for a report or a spreadsheet.</dd>
+      </dl>
+    </details>
+    <p class="readout" id="lab-status" aria-live="polite"></p>
+    <div class="tiles" id="tiles"></div>
+    <div class="table-wrap">
+      <table class="matrix" id="matrix">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button type="button" id="copy-csv">Copy as CSV</button>
+      <button type="button" id="copy-md">Copy as Markdown</button>
+      <span class="fine" id="copy-status"></span>
+    </div>
+    <textarea id="export" class="mono" rows="6" readonly hidden aria-label="Exported results"></textarea>
+  </main>
+
+  <!-- ============================== BUILD ============================= -->
+  <main class="view" id="view-build" hidden>
+    <div class="floor">
+      <canvas id="editor" aria-label="Level editor. Pick a tool, then click or drag on the grid."></canvas>
+    </div>
+    <aside class="panel">
+      <section class="block">
+        <h2>Paint</h2>
+        <div class="algos tools-grid" id="tools" role="radiogroup" aria-label="Tool">
+          <label><input type="radio" name="tool" value="#" checked><span>Wall</span></label>
+          <label><input type="radio" name="tool" value=" "><span>Floor</span></label>
+          <label><input type="radio" name="tool" value="$"><span>Crate</span></label>
+          <label><input type="radio" name="tool" value="."><span>Goal</span></label>
+          <label><input type="radio" name="tool" value="@"><span>Keeper</span></label>
+        </div>
+        <div class="row">
+          <label>Width <input type="number" id="ed-w" min="5" max="14" value="9"></label>
+          <label>Height <input type="number" id="ed-h" min="5" max="11" value="8"></label>
+          <button type="button" id="ed-clear">Empty room</button>
+        </div>
+        <p class="readout" id="ed-status" aria-live="polite"></p>
+        <div class="row">
+          <button type="button" id="ed-play" class="primary">Play this level</button>
+        </div>
+        <details class="help">
+          <summary>How this works</summary>
+          <dl>
+            <dt>Paint</dt><dd>Pick Wall, Floor, Crate, Goal or Keeper, then click or drag on the grid. A crate painted on a goal counts as already home. There is one keeper; painting it again moves it.</dd>
+            <dt>Width, Height, Empty room</dt><dd>Resize the grid, or clear it to an empty walled room.</dd>
+            <dt>The message</dt><dd>Says whether the level obeys the rules: one keeper, as many crates as goals, walls all the way round.</dd>
+            <dt>Play this level</dt><dd>Opens it in Play. The AI best box then tells you whether it can be solved and in how many pushes.</dd>
+          </dl>
+        </details>
+      </section>
+
+      <section class="block">
+        <h2>Generate</h2>
+        <p class="fine">Levels are built backwards from the solved position by pulling crates, so every one of them can be solved. The solver grades the candidates and keeps the hardest.</p>
+        <div class="row">
+          <label>Size
+            <select id="gen-size">
+              <option value="8,7,2">Small, 2 crates</option>
+              <option value="9,8,3" selected>Medium, 3 crates</option>
+              <option value="10,8,4">Large, 4 crates</option>
+              <option value="11,9,5">Huge, 5 crates</option>
+            </select>
+          </label>
+          <label>Seed <input type="number" id="gen-seed" min="0" max="99999" value="1"></label>
+          <button type="button" id="gen-go">Generate</button>
+        </div>
+        <p class="fine">The seed is the level's number: the same size and seed always give the same level.</p>
+      </section>
+
+      <section class="block">
+        <h2>Level text</h2>
+        <p class="fine"><code>#</code> wall &nbsp;<code>$</code> crate &nbsp;<code>.</code> goal &nbsp;<code>@</code> keeper &nbsp;<code>*</code> crate on goal &nbsp;<code>+</code> keeper on goal. Paste any level in this format, or copy yours from here.</p>
+        <textarea id="ed-text" class="mono" rows="9" spellcheck="false" aria-label="Level text"></textarea>
+      </section>
+    </aside>
+  </main>
+
+  <!-- ============================== GUIDE ============================= -->
+  <main class="view" id="view-guide" hidden>
+    <article class="guide">
+      <section>
+        <h2>The game</h2>
+        <p>Sokoban is Japanese for warehouse keeper. You walk the keeper around a storeroom and push crates onto the marked goals. A level is solved when every crate stands on a goal.</p>
+        <p>Two rules make it hard. You push one crate at a time, and you can never pull. A crate shoved into a corner stays there for good, so one careless push can make a level impossible.</p>
+        <table class="keys">
+          <tbody>
+            <tr><th><kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>&rarr;</kbd> or <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></th><td>Move the keeper. Walk into a crate to push it. On a phone, swipe on the floor or use the arrow pad.</td></tr>
+            <tr><th><kbd>Z</kbd> &nbsp;<kbd>Y</kbd></th><td>Undo, redo</td></tr>
+            <tr><th><kbd>R</kbd></th><td>Restart the level</td></tr>
+            <tr><th><kbd>H</kbd></th><td>Hint. Press again to let the keeper do it</td></tr>
+            <tr><th><kbd>Space</kbd></th><td>Play or pause the timeline</td></tr>
+            <tr><th><kbd>N</kbd> &nbsp;<kbd>P</kbd></th><td>Next level, previous level</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>The five sections</h2>
+        <dl>
+          <dt>Play</dt><dd>Solve levels yourself, ask for hints, or have a solver do it while you watch.</dd>
+          <dt>Race</dt><dd>All four algorithms solve the level on the floor at the same time. Graphs show who did how much work.</dd>
+          <dt>Lab</dt><dd>The same comparison across a whole pack of levels, as a table you can copy into a report.</dd>
+          <dt>Build</dt><dd>Draw your own level or generate one, then play it.</dd>
+          <dt>Guide</dt><dd>This page. Each box in the other sections also has its own "How this works" line.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>How a computer solves it</h2>
+        <p>The solver thinks in <em>positions</em>: one arrangement of the crates, plus the part of the floor the keeper can walk to. From a position it can make a <em>push</em>, which leads to a new position. Solving means finding a chain of pushes from the start to a position where every crate is home.</p>
+        <p>The number of positions explodes. Three crates in a small room already allow tens of thousands. The four algorithms differ only in the order they look through them, and in what they refuse to look at.</p>
+        <dl class="ladder">
+          <dt style="--swatch: var(--s1)">BFS (breadth-first search)</dt>
+          <dd>Looks at every position one push from the start, then every position two pushes away, and so on. It has no idea which direction is promising. It is the baseline the others are measured against.</dd>
+          <dt style="--swatch: var(--s2)">A*</dt>
+          <dd>Adds a <em>heuristic</em>, an estimate of how many pushes are still needed: for each crate, the grid distance to its nearest goal. A* always examines the position where pushes made plus pushes estimated is smallest, so it heads for the goals.</dd>
+          <dt style="--swatch: var(--s3)">A* + Deadlock</dt>
+          <dd>Adds knowledge. Before a push is even considered, four rules check whether it has just lost the game. If so it is thrown away, along with everything that would have followed.</dd>
+          <dt style="--swatch: var(--s4)">A* + Deadlock + Matching</dt>
+          <dd>Adds a sharper heuristic. Plain distance sees through walls and lets every crate aim at the same goal. This one measures real push distance and gives each crate a goal of its own, choosing the cheapest pairing.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Why all four report the same number of pushes</h2>
+        <p>Because all four are guaranteed to find a solution with the fewest pushes possible. That is the point of the comparison: the smarter algorithms do not cut corners. They reach the same best answer after examining a small fraction of the positions.</p>
+        <p>What does differ:</p>
+        <dl>
+          <dt>Search steps</dt><dd>Positions expanded. On a hard level BFS examines tens of thousands where the best algorithm examines a few hundred.</dd>
+          <dt>Time</dt><dd>Follows from the search steps.</dd>
+          <dt>Keeper moves</dt><dd>Many different solutions can share the same push count while the keeper walks a different route. Each algorithm stops at the first optimal solution it meets, so their move counts often differ.</dd>
+        </dl>
+        <p>The differences are small on the training levels and large on the Showdown pack, which was chosen for exactly this.</p>
+      </section>
+
+      <section>
+        <h2>Reading the numbers</h2>
+        <dl>
+          <dt>Positions expanded</dt><dd>Positions the algorithm took out and examined. Its search steps.</dd>
+          <dt>Generated</dt><dd>New positions it discovered while doing so.</dd>
+          <dt>Waiting</dt><dd>Discovered positions not yet examined (the frontier).</dd>
+          <dt>Pushes deep</dt><dd>How far from the start the search currently is.</dd>
+          <dt>Pruned, discarded</dt><dd>Pushes rejected by a deadlock rule before being searched.</dd>
+          <dt>Pushes, moves</dt><dd>The length of a solution, counted in crate pushes and in keeper steps.</dd>
+          <dt>Out of budget, out of time</dt><dd>Every search has the same limit. One that hits it gives up, and its numbers are minimums.</dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>The deadlock rules</h2>
+        <p>A deadlock is a position that can never be solved, whatever you do next. Turn on Dead squares in Play to see the first three on any level.</p>
+        <dl>
+          <dt>Corner trap</dt><dd>A crate with a wall on one side and another wall above or below can never be pushed again.</dd>
+          <dt>Wall-line trap</dt><dd>A crate against a wall can only slide along it. If that stretch of wall has no goal, the crate is lost.</dd>
+          <dt>Dead square</dt><dd>The general case: a square from which no sequence of pushes reaches any goal.</dd>
+          <dt>Freeze deadlock</dt><dd>Crates that block each other so that none can move, with at least one of them off its goal. Two crates side by side against a wall is the classic.</dd>
+        </dl>
+        <p>In Play, the moment you cause one of these a warning names the rule, so you can undo straight away.</p>
+      </section>
+
+      <section>
+        <h2>Under the hood</h2>
+        <p>The rules, the four algorithms, the level generator and the benchmark are written in Python. This page loads those same Python files and runs them in your browser, so the numbers you see here are the numbers the command-line tools print.</p>
+      </section>
+    </article>
+  </main>
+</div>
+
+<script src="pyodide/pyodide.js"></script>
+<script src="render.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
