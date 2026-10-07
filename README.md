@@ -3,6 +3,8 @@
 **A Heuristic and Deadlock-Aware Search System for Sokoban Puzzle Solving**
 CS23533 Foundations of Artificial Intelligence
 
+**Play it online:** <https://mettumanichandhansai.github.io/sokoban-search-lab/>
+
 A playable Sokoban with an AI that solves it four ways, each smarter than the
 last, and shows you exactly what each idea buys:
 
@@ -259,11 +261,26 @@ What the reviews promised, and what now delivers it:
 
 `docs/` is a complete static website. Any static host works.
 
-**GitHub Pages**
+**GitHub Pages (how this project is hosted)**
 
-1. Push this repository to GitHub.
-2. Settings → Pages → Source: *Deploy from a branch*, branch `main`, folder `/docs`.
-3. The site appears at `https://<user>.github.io/<repository>/`.
+The live site is <https://mettumanichandhansai.github.io/sokoban-search-lab/>.
+GitHub publishes whatever is on the `gh-pages` branch, which holds a copy of
+the `docs/` folder. To update the public site after a change:
+
+```bash
+python run_game.py --build-only
+git add -A
+git commit -m "Describe the change"
+git push origin HEAD:main
+git push origin "$(git commit-tree HEAD:docs -p origin/gh-pages -m 'Deploy site'):gh-pages"
+```
+
+The last line copies the current `docs/` onto `gh-pages`. It works in Git
+Bash and in PowerShell. The site refreshes about a minute later.
+
+To skip that last line for good: in the repository on github.com open
+Settings → Pages, choose *Deploy from a branch*, branch `main`, folder
+`/docs`. From then on every push to `main` updates the site.
 
 **Netlify** – drag the `docs` folder onto <https://app.netlify.com/drop>.
 
