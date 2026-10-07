@@ -21,6 +21,7 @@ class Site(unittest.TestCase):
             self.assertEqual((SITE / name).read_bytes(), (WEB / name).read_bytes(), name)
         page = (SITE / "index.html").read_text(encoding="utf-8")
         self.assertTrue(page.startswith("<!doctype html>"))
+        self.assertTrue((SITE / ".nojekyll").is_file())
         self.assertIn((WEB / "index.html").read_text(encoding="utf-8"), page)
 
     def test_python_runtime_is_vendored(self):

@@ -49,6 +49,7 @@ PAGE = """<!doctype html>
 def build():
     """Refresh docs/ from the sources. Returns the site folder."""
     SITE.mkdir(exist_ok=True)
+    (SITE / ".nojekyll").touch()        # GitHub Pages: serve the files as they are
     for name in ("style.css", "render.js", "app.js"):
         shutil.copyfile(WEB / name, SITE / name)
     content = (WEB / "index.html").read_text(encoding="utf-8")
