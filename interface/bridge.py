@@ -84,7 +84,7 @@ class Game:
             deadlock = {"rule": rule, "name": name, "why": why, "crates": sorted(crates)}
         return {
             "player": state.player, "boxes": sorted(state.boxes),
-            "cursor": self.cursor, "length": len(self.moves),
+            "cursor": self.cursor, "length": len(self.moves), "moves": self.moves,
             "pushes": sum(move.isupper() for move in played),
             "last": played[-1:], "solved": is_goal(self.level, state),
             "ai_from": self.ai_from, "hints": self.hints, "deadlock": deadlock,
@@ -234,6 +234,11 @@ class Game:
         return report
 
     # --------------------------------------------------------------- editor
+
+    def check(self, text):
+        """Validate level text without starting it (LevelError says what is wrong)."""
+        level, state = parse_level(text)
+        return {"crates": len(state.boxes), "width": level.width, "height": level.height}
 
     def generate(self, seed=0, width=9, height=8, boxes=3):
         width, height = _clamp(width, 6, 12), _clamp(height, 6, 10)

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Sokoban Search Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Saira+Stencil+One&display=swap">
+<link rel="stylesheet" href="style.css">
+
+<div class="app" id="app" data-mode="play">
+
+  <header class="top">
+    <h1 class="wordmark">Sokoban <span>Search Lab</span></h1>
+    <nav class="modes" aria-label="Sections">
+      <button type="button" data-mode="play" aria-current="page">Play</button>
+      <button type="button" data-mode="race">Race</button>
+      <button type="button" data-mode="lab">Lab</button>
+      <button type="button" data-mode="build">Build</button>
+    </nav>
+    <div class="tools">
+      <button type="button" id="sound" class="ghost" aria-pressed="true">Sound on</button>
+      <button type="button" id="theme" class="ghost">Night shift</button>
+    </div>
+  </header>
+
+  <!-- Bay label: which level is on the floor. Shown in Play and Race. -->
+  <section class="bay" id="bay" aria-label="Level">
+    <button type="button" id="prev" class="step" aria-label="Previous level">&#9664;</button>
+    <div class="bay-code" id="bay-code">T-01</div>
+    <div class="bay-text">
+      <label class="visually-hidden" for="level">Level</label>
+      <select id="level"></select>
+      <p id="note" class="note"></p>
+    </div>
+    <button type="button" id="next" class="step" aria-label="Next level">&#9654;</button>
+  </section>
+
+  <!-- ============================== PLAY ============================== -->
+  <main class="view" id="view-play">
+    <div class="floor" id="floor">
+      <canvas id="board" tabindex="0" aria-label="Sokoban board. Use the arrow keys to move."></canvas>
+      <div class="tip" id="tip" hidden></div>
+      <div class="banner" id="banner" hidden>
+        <strong id="banner-title"></strong>
+        <span id="banner-text"></span>
+      </div>
+      <div class="boot" id="boot">
+        <div class="boot-card">
+          <p class="eyebrow">Starting up</p>
+          <p id="boot-text">Loading the Python runtime&hellip;</p>
+          <div class="boot-bar"><i id="boot-bar"></i></div>
+          <p class="fine">The solvers on this page are the project's own Python modules, running in your browser through WebAssembly.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <section class="block">
+        <h2>Your run</h2>
+        <dl class="stats">
+          <div><dt>Pushes</dt><dd id="s-pushes">0</dd></div>
+          <div><dt>Moves</dt><dd id="s-moves">0</dd></div>
+          <div><dt>Time</dt><dd id="s-time">0:00</dd></div>
+          <div><dt>AI best</dt><dd id="s-par" title="Fewest pushes possible, found by the solver">&ndash;</dd></div>
+        </dl>
+        <div class="row">
+          <button type="button" id="undo" title="Z">Undo</button>
+          <button type="button" id="redo" title="Y">Redo</button>
+          <button type="button" id="restart" title="R">Restart</button>
+          <button type="button" id="hint" title="H">Hint</button>
+        </div>
+        <p class="result" id="result" hidden></p>
+        <div class="dpad" aria-label="Move">
+          <button type="button" data-move="U" aria-label="Up">&#9650;</button>
+          <button type="button" data-move="L" aria-label="Left">&#9664;</button>
+          <button type="button" data-move="D" aria-label="Down">&#9660;</button>
+          <button type="button" data-move="R" aria-label="Right">&#9654;</button>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Show on the floor</h2>
+        <div class="chips">
+          <label><input type="checkbox" id="o-dead"> Dead squares</label>
+          <label><input type="checkbox" id="o-trace" checked> Search trace</label>
+          <label><input type="checkbox" id="o-paths"> Your path vs AI</label>
+        </div>
+        <p class="fine" id="legend"></p>
+      </section>
+
+      <section class="block">
+        <h2>Solver</h2>
+        <div class="algos" id="algos" role="radiogroup" aria-label="Algorithm"></div>
+        <p class="fine" id="algo-idea"></p>
+        <div class="row">
+          <button type="button" id="solve" class="primary">Solve from here</button>
+          <button type="button" id="stop" hidden>Stop</button>
+        </div>
+        <p class="readout" id="readout" aria-live="polite">Pick an algorithm and press Solve. The answer is added to the timeline below.</p>
+      </section>
+
+      <section class="block">
+        <h2>Timeline</h2>
+        <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Position in the move list">
+        <div class="row">
+          <button type="button" id="t-start" aria-label="Back to start">&#9198;</button>
+          <button type="button" id="t-back" aria-label="Step back">&#9664;</button>
+          <button type="button" id="t-play" class="primary">Play</button>
+          <button type="button" id="t-fwd" aria-label="Step forward">&#9654;</button>
+          <label class="speed">Speed
+            <select id="speed">
+              <option value="3">Slow</option>
+              <option value="8" selected>Normal</option>
+              <option value="20">Fast</option>
+              <option value="60">Blur</option>
+            </select>
+          </label>
+        </div>
+        <p class="fine mono" id="lurd"></p>
+      </section>
+    </aside>
+  </main>
+
+  <!-- ============================== RACE ============================== -->
+  <main class="view" id="view-race" hidden>
+    <div class="race-head">
+      <div>
+        <h2>Four algorithms, one level, same start</h2>
+        <p class="lede">Each lane shows the position that algorithm is examining right now. The bar counts the positions it has expanded, on a log scale: every tick is ten times more work.</p>
+      </div>
+      <div class="row">
+        <button type="button" id="race-go" class="primary">Start race</button>
+        <button type="button" id="race-stop" hidden>Stop</button>
+      </div>
+    </div>
+    <div class="lanes" id="lanes"></div>
+    <p class="verdict" id="verdict" aria-live="polite"></p>
+  </main>
+
+  <!-- =============================== LAB ============================== -->
+  <main class="view" id="view-lab" hidden>
+    <div class="race-head">
+      <div>
+        <h2>Benchmark</h2>
+        <p class="lede">Every algorithm on every level, from the same start position. Cells show positions expanded; the bar is on a log scale. A hollow bar means the search ran out of budget.</p>
+      </div>
+      <div class="row wrap">
+        <label>Pack <select id="lab-pack"></select></label>
+        <label>Budget per search
+          <select id="lab-budget">
+            <option value="1">1 second</option>
+            <option value="3" selected>3 seconds</option>
+            <option value="10">10 seconds</option>
+          </select>
+        </label>
+        <button type="button" id="lab-go" class="primary">Run benchmark</button>
+        <button type="button" id="lab-stop" hidden>Stop</button>
+      </div>
+    </div>
+    <p class="readout" id="lab-status" aria-live="polite"></p>
+    <div class="tiles" id="tiles"></div>
+    <div class="table-wrap">
+      <table class="matrix" id="matrix">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row wrap">
+      <button type="button" id="copy-csv">Copy as CSV</button>
+      <button type="button" id="copy-md">Copy as Markdown</button>
+      <span class="fine" id="copy-status"></span>
+    </div>
+    <textarea id="export" class="mono" rows="6" readonly hidden aria-label="Exported results"></textarea>
+  </main>
+
+  <!-- ============================== BUILD ============================= -->
+  <main class="view" id="view-build" hidden>
+    <div class="floor">
+      <canvas id="editor" aria-label="Level editor. Pick a tool, then click or drag on the grid."></canvas>
+    </div>
+    <aside class="panel">
+      <section class="block">
+        <h2>Paint</h2>
+        <div class="algos tools-grid" id="tools" role="radiogroup" aria-label="Tool">
+          <label><input type="radio" name="tool" value="#" checked><span>Wall</span></label>
+          <label><input type="radio" name="tool" value=" "><span>Floor</span></label>
+          <label><input type="radio" name="tool" value="$"><span>Crate</span></label>
+          <label><input type="radio" name="tool" value="."><span>Goal</span></label>
+          <label><input type="radio" name="tool" value="@"><span>Keeper</span></label>
+        </div>
+        <div class="row wrap">
+          <label>Width <input type="number" id="ed-w" min="5" max="14" value="9"></label>
+          <label>Height <input type="number" id="ed-h" min="5" max="11" value="8"></label>
+          <button type="button" id="ed-clear">Empty room</button>
+        </div>
+        <p class="readout" id="ed-status" aria-live="polite"></p>
+        <div class="row">
+          <button type="button" id="ed-play" class="primary">Play this level</button>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Generate</h2>
+        <p class="fine">Levels are built backwards from the solved position by pulling crates, so every one of them can be solved. The solver grades the candidates and keeps the hardest.</p>
+        <div class="row wrap">
+          <label>Size
+            <select id="gen-size">
+              <option value="8,7,2">Small, 2 crates</option>
+              <option value="9,8,3" selected>Medium, 3 crates</option>
+              <option value="10,8,4">Large, 4 crates</option>
+              <option value="11,9,5">Huge, 5 crates</option>
+            </select>
+          </label>
+          <label>Seed <input type="number" id="gen-seed" min="0" max="99999" value="1"></label>
+          <button type="button" id="gen-go">Generate</button>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Level text</h2>
+        <p class="fine"><code>#</code> wall &nbsp;<code>$</code> crate &nbsp;<code>.</code> goal &nbsp;<code>@</code> keeper &nbsp;<code>*</code> crate on goal &nbsp;<code>+</code> keeper on goal. Paste any level in this format.</p>
+        <textarea id="ed-text" class="mono" rows="9" spellcheck="false" aria-label="Level text"></textarea>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script src="pyodide/pyodide.js"></script>
+<script src="render.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
