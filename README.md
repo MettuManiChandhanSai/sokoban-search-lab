@@ -1,4 +1,4 @@
-# Sokoban Search Lab
+# Sokoban Search Lab (Hueristics)
 
 **A Heuristic and Deadlock-Aware Search System for Sokoban Puzzle Solving**
 CS23533 Foundations of Artificial Intelligence
